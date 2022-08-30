@@ -3,6 +3,8 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "./Exchange.sol";
 import "./Factory.sol";
 
@@ -13,6 +15,7 @@ import "./Factory.sol";
 contract StakingPool{
     
     address public tokenAddress; 
+    using SafeERC20 for IERC20;
     
     // event that must be emited when tokens were claimed 
     event TokenWithdraw( address indexed user, uint amount);
@@ -64,16 +67,16 @@ contract StakingPool{
     uint private constant MIN_REWARD_PER_DAY = 10**18;
 
     // RWD token object
-    ERC20 public immutable rewardingToken;
+    IERC20 public immutable rewardingToken;
 
     // LP token object
-    ERC20 public immutable stakedToken;
+    IERC20 public immutable stakedToken;
 
     // accuracy in token reward calculating
     uint private constant ACCURACY = 10**14;
 
     // information about each user that stakes his/her tokens
-    mapping (address => UserAbout) userAbout;
+    mapping (address => UserAbout) public userAbout;
 
     // locker for users that had already deposited funds
     bool public lock;
@@ -84,8 +87,8 @@ contract StakingPool{
      * @param lpAddress token for stake
      */
     constructor(address lpAddress, address rewardTokenAddress){
-        stakedToken = ERC20(lpAddress);
-        rewardingToken = ERC20(rewardTokenAddress);
+        stakedToken = IERC20(lpAddress);
+        rewardingToken = IERC20(rewardTokenAddress);
         lock = false;
         owner = msg.sender;
     }
@@ -105,7 +108,7 @@ contract StakingPool{
     *           if user is not the msg.sender
     */
     modifier onlyOwner(){
-        require(owner == msg.sender, "You're not the owner of these funds");
+        require(owner == msg.sender, "Not the owner!");
         _;
     }
 
@@ -114,10 +117,10 @@ contract StakingPool{
      * @param amount - amount of tokens to deposit
      */
     function firstDeposit(uint amount)
+    public
     onlyOwner
-    locker
-    public{
-        rewardingToken.transferFrom(msg.sender, address(this), amount);
+    locker {
+        SafeERC20.safeTransferFrom(rewardingToken, msg.sender, address(this), amount);
         userAbout[msg.sender].weight = 1;
         userAbout[msg.sender].startBlock = 1;
         emit UpdatedTokenDeposit(msg.sender, amount);
@@ -134,10 +137,11 @@ contract StakingPool{
      */
     function partialLPDeposit(uint amount)
     public {
-        require(amount >= MIN, "Deposite amount of tokens should be minimum 1 RWD");
+        require(amount >= MIN, "Deposite amount minimum 1 LP!");
         userAbout[msg.sender].amount +=  amount;
         userAbout[msg.sender].timestamp = block.timestamp;
-        stakedToken.transferFrom(msg.sender, address(this), amount);
+
+        SafeERC20.safeTransferFrom(stakedToken, msg.sender, address(this), amount);
 
         if(userAbout[msg.sender].weight == 0){
             userAbout[msg.sender].weight = 1;
@@ -170,14 +174,16 @@ contract StakingPool{
      */
     function withdrawAllLPTokens()
     public {
-        uint LPTokenAmount = userAbout[msg.sender].amount;
-        require(LPTokenAmount > 0, "You don't have LP tokens in this pool");
-        userAbout[msg.sender].amount = 0;
+        uint tokenLPAmount = userAbout[msg.sender].amount;
+        require(tokenLPAmount > 0, "Don't have enough LPs in pool");
+        
+        unchecked {
+            userAbout[msg.sender].amount -= tokenLPAmount;
+        }
 
         updatingReward(msg.sender);
-
-        stakedToken.transfer(msg.sender, LPTokenAmount);
-        emit TokenWithdraw(msg.sender, LPTokenAmount);
+        SafeERC20.safeTransfer(stakedToken, msg.sender, tokenLPAmount);
+        emit TokenWithdraw(msg.sender, tokenLPAmount);
     }
 
     /**
@@ -186,12 +192,17 @@ contract StakingPool{
      */
     function partialWithdrawOfLPTokens(uint amount)
     public{
-        uint LPTokenAmount = userAbout[msg.sender].amount;
-        require(LPTokenAmount >= amount, "You don't have enough LP tokens in the pool");
+        uint tokenLPAmount = userAbout[msg.sender].amount;
+        require(tokenLPAmount >= amount, "Don't have enough LPs in pool");
+        
+        unchecked {
+            userAbout[msg.sender].amount -= amount;
+        }
 
-        userAbout[msg.sender].amount -= amount;
         updatingReward(msg.sender);
-        stakedToken.transfer(msg.sender, amount);
+
+        SafeERC20.safeTransfer(stakedToken, msg.sender, amount);
+
         emit TokenWithdraw(msg.sender, amount);
     }
 
@@ -212,13 +223,17 @@ contract StakingPool{
      */
     function partialWithdrawOfRewardTokens(uint amount)
     public{
-        uint rewardTokenAmount = getUserReward();
-        require(rewardTokenAmount >= amount, "You don't have enough reward tokens in the pool");
-
+        uint tokenRWDAmount = userAbout[msg.sender].reward;
+        require(tokenRWDAmount >= amount, "Don't have enough RWDs in pool");
+        
         unchecked {
             userAbout[msg.sender].reward -= amount;
         }
-        rewardingToken.transferFrom(address(this), msg.sender, amount);
+
+        updatingReward(msg.sender);
+
+        SafeERC20.safeTransfer(rewardingToken, msg.sender, amount);
+
         emit TokenWithdraw(msg.sender, amount);
     }
 

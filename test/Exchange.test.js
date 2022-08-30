@@ -1,6 +1,7 @@
 const { expect }  = require("chai");
 const hre = require("hardhat");
 const ethers = hre.ethers;
+const utils = require("ethers").utils;
 
 describe ("Exchange", async () =>{
     let owner;
@@ -15,10 +16,10 @@ describe ("Exchange", async () =>{
         [owner, user1] = await ethers.getSigners();
 
         const Token = await ethers.getContractFactory("Token");
-        token = await Token.deploy("Lalala", "LLL", 1000000);
+        token = await Token.deploy("Lalala", "LLL");
         expect(await token.deployed());
 
-        token2 = await Token.deploy("Lalala", "LLL", 1000000);
+        token2 = await Token.deploy("Lalala", "LLL");
         expect(await token2.deployed());
 
         const Exchange = await ethers.getContractFactory("Exchange");
@@ -36,7 +37,7 @@ describe ("Exchange", async () =>{
             expect(await exchange.totalSupply()).to.eq(0);
             expect(await exchange.symbol()).to.eq("LP");
             expect(await token.name()).to.eq("Lalala");
-            expect(await token.totalSupply()).to.eq(1000000);
+            expect(await token.totalSupply()).to.eq(utils.parseEther("500.0"));
             expect(await token.symbol()).to.eq("LLL");
         })
     })
@@ -105,7 +106,7 @@ describe ("Exchange", async () =>{
     
             await expect(
                 exchange.getEthAmount(0)
-            ).to.be.revertedWith("Too small amount of the sold tokens");
+            ).to.be.revertedWith("Too small amount of tokens");
 
             expect(await exchange.getEthAmount(50)).to.eq(1196);
         })
@@ -252,7 +253,7 @@ describe ("Exchange", async () =>{
 
             await expect(
                 exchange.fromEthToTokensSwap(50000000)
-            ).to.be.revertedWith("Too small amount of tokens you want to buy");
+            ).to.be.revertedWith("Too small amount of tokens");
         })
 
         it("Adds the correct receiver address and amount to the emited event", async () =>{
@@ -389,8 +390,8 @@ describe ("Exchange", async () =>{
             const Token = await ethers.getContractFactory("Token");
             const Factory = await ethers.getContractFactory("Factory");
 
-            const firstToken = await Token.deploy("First", "FST", 2000000);
-            const secondToken = await Token.connect(user1).deploy("Second", "SND", 1000000);
+            const firstToken = await Token.deploy("First", "FST");
+            const secondToken = await Token.connect(user1).deploy("Second", "SND");
             const factory = await Factory.deploy();
             
             expect(await firstToken.deployed());

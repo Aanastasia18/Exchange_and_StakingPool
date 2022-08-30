@@ -164,7 +164,7 @@ contract Exchange is ERC20{
     */
     function getTokenAmount( 
         uint _soldEth
-    ) view public returns(uint){
+    ) public view returns(uint){
         require(_soldEth > 0, "Too small amount of the sold eth");
         uint tokenReserve = getReserveAmount();
         return getAmount(
@@ -184,7 +184,7 @@ contract Exchange is ERC20{
     function getEthAmount(
         uint _soldToken
     ) public view returns(uint){
-        require(_soldToken > 0, "Too small amount of the sold tokens");
+        require(_soldToken > 0, "Too small amount of tokens");
 
         uint tokenReserve = getReserveAmount();
         return getAmount(
@@ -214,7 +214,7 @@ contract Exchange is ERC20{
             );
 
         // calculated amount of tokens must be more or equal minimum amount of tokens that user agree to buy 
-        require(_minTokens <= boughtTokens, "Too small amount of tokens you want to buy");
+        require(_minTokens <= boughtTokens, "Too small amount of tokens");
         IERC20(tokenAddr).transfer(receiver, boughtTokens);
     }
 

@@ -13,10 +13,10 @@ describe("Factory", async ()=>{
         [owner, user] = await ethers.getSigners();
 
         const Token = await ethers.getContractFactory("Token");
-        token = await Token.deploy("Lalala", "LLL", 1000000);
+        token = await Token.deploy("Lalala", "LLL");
         expect(await token.deployed());
 
-        token2 = await Token.deploy("Lalala", "LLL", 1000000);
+        token2 = await Token.deploy("Lalala", "LLL");
         expect(await token2.deployed());
 
         const Factory = await ethers.getContractFactory("Factory");
